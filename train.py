@@ -9,6 +9,7 @@ import torch.nn.functional as F
 
 from dataset import DataSet
 from Model import Down1d, Up1d, Bottleneck, AudioUnet
+from utility import avg_sqrt_l2_loss
 
 import librosa
 
@@ -26,13 +27,27 @@ class Solver(object):
 		self.num_layers = self.config['num_layers']
 		self.batch_size = self.config['batch_size']
 		self.log_dir = self.config['log_dir']
+		self.epoch = self.config['epoch']
+		self.model_save_dir = self.config['model_save_dir']
+		self.model_save_step = self.config['model_save_step']
 
 	def build_model(self):
+		device = torch.device("cuda:0" if torch.cuda.is_avaialble() else "cpu")
+
 		self.model = AudioUnet(self.num_layers)
+
+		#Data Parallel
+		# if torch.cuda.device_count() > 1:
+		# 	model = nn.DataParallel(model)
+		# model.to(device)
+
 		if self.alg = "adam":
 			self.optimizer = torch.optim.Adam(self.model.parameters(), self.lr, betas=self.betas)
 		else
 			raise ValueError('Invalid Optimizer: ' + self.alg)
+
+		#Loss function not implemented
+		# self.loss = 
 
 	def print_network(self):
 		"""Print out the network information"""
@@ -51,11 +66,33 @@ class Solver(object):
 		"""Not Implemented Most prolly inside create model routine"""
 
 	def train(self):
-		train_data = DataSet(X_train, Y_train)
-		val_data = DataSet(X_val, Y_val)
+		build_model()
+
+		#train Loops
+		for epoch in range(self.epoch):
+			for data in self.data_loader:
+				data.to(device)
+
+				output = self.model(data)
+				loss = avg_sqrt_l2_loss(data, output) 
+				self.optimizer.zero_grad()
+				loss.backward()
+				self.optimizer.step()
+
+			print('epoch [{}/{}], loss:{:.4f}'.format(epoch+1, num_epochs, loss.data[0]))
+
+			#tensorboard steps
+
+			#checkpoint the model
+			if (epoch+1) % self.model_save_step == 0:
+				model_path = os.path.join(self.model_save_dir, '{}-model.ckpt'.format(epoch+1))
+		torch.save(self.model.state_dict(), './AudioUnet.pth')
+
+
 		
 
 
-	def load(self):
-		"""Not implemented"""
+
+	def load_data(self):
+		"""Load the data"""
 
