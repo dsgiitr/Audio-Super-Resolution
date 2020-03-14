@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dataset import DataSet
-from Model import Down1d, Up1d, Bottleneck, AudioUnet
+from model import Down1d, Up1d, Bottleneck, AudioUnet
 from utility import avg_sqrt_l2_loss
 
 import librosa
@@ -46,8 +46,6 @@ class Solver(object):
 		else
 			raise ValueError('Invalid Optimizer: ' + self.alg)
 
-		#Loss function not implemented
-		# self.loss = 
 
 	def print_network(self):
 		"""Print out the network information"""
@@ -86,6 +84,9 @@ class Solver(object):
 			#checkpoint the model
 			if (epoch+1) % self.model_save_step == 0:
 				model_path = os.path.join(self.model_save_dir, '{}-model.ckpt'.format(epoch+1))
+				torch.save(self.model.state_dict(), model_path)
+				print('Saved Model checkpoints into {}'.format(self.model_save_dir))
+
 		torch.save(self.model.state_dict(), './AudioUnet.pth')
 
 

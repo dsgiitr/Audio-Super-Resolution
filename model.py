@@ -14,7 +14,7 @@ class Down1D(nn.Module):
 	def __init__(self, in_channel, out_channel, kernel, stride=2, padding):
 		super(Down1D, self).__init__()
 
-		self.c1 = nn.Conv1d(in_channel, out_channel, kernel_size=kernel, stride=stride, padding=kernel/2 )
+		self.c1 = nn.Conv1d(in_channel, out_channel, kernel_size=kernel, stride=stride, padding=kernel/2 ) 
 		nn.init.orthogonal_(self.c1.weight)
 
 	def forward(self, x):
