@@ -6,23 +6,17 @@ Created on Thu Mar 12 20:52:19 2020
 """
 
 import numpy as np
-
+import io
 
 # ----------------------------------------------------------------------------
 
 class DataSet(object):
 
-  def __init__(self,
-               datapoints,
-               labels,
+  def __init__(self,path,
                fake_data=False,
                one_hot=False,
                dtype=None):
-    """Construct a DataSet.
-    one_hot arg is used only if fake_data is true.  `dtype` can be either
-    `uint8` to leave the input as `[0, 255]`, or `float32` to rescale into
-    `[0, 1]`.
-    """
+    datapoints,labels=io.load_h5(path)
     if labels is None:
       labels = np.zeros((len(datapoints),))
 
@@ -55,7 +49,7 @@ class DataSet(object):
   def epochs_completed(self):
     return self._epochs_completed
 
-  def next_batch(self, batch_size, fake_data=False, shuffle=True):
+  def __getitem__(self, batch_size, fake_data=False, shuffle=True):
     """Return the next `batch_size` examples from this data set."""
     if fake_data:
       fake_image = [1] * 784
@@ -63,14 +57,14 @@ class DataSet(object):
         fake_label = [1] + [0] * 9
       else:
         fake_label = 0
-      return [fake_image for _ in xrange(batch_size)], [
-          fake_label for _ in xrange(batch_size)
+      return [fake_image for x in range(batch_size)], [
+          fake_label for x in range(batch_size)
       ]
     start = self._index_in_epoch
     # Shuffle for the first epoch
     if self._epochs_completed == 0 and start == 0 and shuffle:
-      perm0 = numpy.arange(self._num_examples)
-      numpy.random.shuffle(perm0)
+      perm0 = np.arange(self._num_examples)
+      np.random.shuffle(perm0)
       self._datapoints = self.datapoints[perm0]
       self._labels = self.labels[perm0]
     # Go to the next epoch
@@ -83,8 +77,8 @@ class DataSet(object):
       labels_rest_part = self._labels[start:self._num_examples]
       # Shuffle the data
       if shuffle:
-        perm = numpy.arange(self._num_examples)
-        numpy.random.shuffle(perm)
+        perm = np.arange(self._num_examples)
+        np.random.shuffle(perm)
         self._datapoints = self.datapoints[perm]
         self._labels = self.labels[perm]
       # Start next epoch
@@ -93,7 +87,7 @@ class DataSet(object):
       end = self._index_in_epoch
       datapoints_new_part = self._datapoints[start:end]
       labels_new_part = self._labels[start:end]
-      return numpy.concatenate((datapoints_rest_part, datapoints_new_part), axis=0) , numpy.concatenate((labels_rest_part, labels_new_part), axis=0)
+      return np.concatenate((datapoints_rest_part, datapoints_new_part), axis=0) , np.concatenate((labels_rest_part, labels_new_part), axis=0)
     else:
       self._index_in_epoch += batch_size
       end = self._index_in_epoch
