@@ -13,6 +13,4 @@ def avg_sqrt_l2_loss(X, Y):
 	avg_sqrt_l2 = torch.mean(sqrt_l2_loss, dim=0)
 	avg_snr = torch.mean(snr, dim=0)
 
-	#tensorboard trackers
-
 	return avg_sqrt_l2, avg_snr

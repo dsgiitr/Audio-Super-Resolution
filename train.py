@@ -17,10 +17,13 @@ import librosa
 default_opt = {'alg': 'adam', 'lr': 1e-4, 'b1': 0.99, 'b2': 0.999, 'num_layers': 4, 'batch_size': 128}
 
 class Solver(object):
-	def __init__(self, data_loader, config):
+	def __init__(self, config):
 
 		self.config = config
 		# self.data_loader = data_loader make separate function for dataloader
+
+		self.train_path = self.config['train_path']
+		self.eval_path = self.config['eval_path']
 
 		self.alg = self.config['alg']
 		self.lr = self.config['lr']
@@ -57,15 +60,13 @@ class Solver(object):
 		print("The number of parameters: {}".format(num_params))
 
 	def build_tensorboard(self):
-		"""Build a tensorboard logger."""
-		from logger import Logger
-		self.logger = Logger(self.log_dir)
-
-	def create_objective(self, X, Y, ):
-		"""Not Implemented Most prolly inside create model routine"""
+		"""Build a tensorboard SummaryWriter"""
+		from torch.utils.tensorboard import SummaryWriter
+		writer = SummaryWriter(self.logdir)
 
 	def train(self):
 		build_model()
+		build_tensorboard()
 		data_loader = dataloader(self.train_dataset, self.batch, shuffle=True, num_workers=4)
 
 		#train Loops
@@ -85,12 +86,16 @@ class Solver(object):
 			# print('epoch [{}/{}], loss:{:.4f}'.format(epoch+1, num_epochs, tr_l2_loss.data[0]))
 			tr_l2_loss, tr_l2_snr = self.eval_err(self.train_dataset, n_batch=self.batch_size)
 			va_l2_loss, va_l2_snr = self.eval_err(self.eval_dataset, n_batch=self.batch_size)
-			#tensorboard steps
 
 			print("Epoch {} of {} took {:.3f}s ({} minibatches)".format(epoch, self.epoch, end_time-start_time, len(self.train_dataset//self.batch_size)))
 			print("Training l2_loss/segsnr:\t\t{:.6f}\t{:.6f}".format(tr_l2_loss, tr_l2_snr))
 			print("Validation l2_loss/segsnr:\t\t{:.6f}\t{:.6f}".format(va_l2_loss, va_l2_snr))
 			
+			#Add Scalar to Summary Writer
+			writer.add_scalar('tr_l2_loss', tr_l2_loss, epoch)
+			writer.add_scalar('tr_l2_snr', tr_l2_snr, epoch)
+			writer.add_scalar('va_l2_snr', va_l2_snr, epoch)
+
 			#checkpoint the model
 			if (epoch+1) % self.model_save_step == 0:
 				model_path = os.path.join(self.model_save_dir, '{}-model.ckpt'.format(epoch+1))
@@ -114,6 +119,8 @@ class Solver(object):
 		return tot_l2_loss / (bn+1), tot_snr / (bn+1)
 
 
-	def load_data(self):
-		"""Load the data"""
+	def load_dataset(self, train=True):
+		"""Load the dataset"""
+		self.train_dataset = DataSet(self.train_path)
+		self.eval_dataset = DataSet(self.eval_path)
 
