@@ -15,4 +15,4 @@ def avg_sqrt_l2_loss(X, Y):
 
 	#tensorboard trackers
 
-	return avg_sqrt_l2
+	return avg_sqrt_l2, avg_snr
