@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.utils.data.Dataloader as dataloader
 
 from dataset import DataSet
 from model import Down1d, Up1d, Bottleneck, AudioUnet
@@ -19,7 +20,7 @@ class Solver(object):
 	def __init__(self, data_loader, config):
 
 		self.config = config
-		self.data_loader = data_loader
+		# self.data_loader = data_loader make separate function for dataloader
 
 		self.alg = self.config['alg']
 		self.lr = self.config['lr']
@@ -32,14 +33,14 @@ class Solver(object):
 		self.model_save_step = self.config['model_save_step']
 
 	def build_model(self):
-		device = torch.device("cuda:0" if torch.cuda.is_avaialble() else "cpu")
+		self.device = torch.device("cuda:0" if torch.cuda.is_avaialble() else "cpu")
 
 		self.model = AudioUnet(self.num_layers)
 
 		#Data Parallel
 		# if torch.cuda.device_count() > 1:
 		# 	model = nn.DataParallel(model)
-		# model.to(device)
+		model = model.to(self.device)
 
 		if self.alg = "adam":
 			self.optimizer = torch.optim.Adam(self.model.parameters(), self.lr, betas=self.betas)
@@ -65,22 +66,31 @@ class Solver(object):
 
 	def train(self):
 		build_model()
+		data_loader = dataloader(self.train_dataset, self.batch, shuffle=True, num_workers=4)
 
 		#train Loops
+		start_time = time.time()
 		for epoch in range(self.epoch):
-			for data in self.data_loader:
-				data.to(device)
+			for X, Y in data_loader:
+				self.model.train()
+				X, Y = X.to(self.device), Y.to(self.device)
 
-				output = self.model(data)
-				loss = avg_sqrt_l2_loss(data, output) 
+				output = self.model(X)
+				tr_l2_loss, tr_l2_snr = avg_sqrt_l2_loss(Y, output) 
 				self.optimizer.zero_grad()
-				loss.backward()
+				tr_l2_loss.backward()
 				self.optimizer.step()
 
-			print('epoch [{}/{}], loss:{:.4f}'.format(epoch+1, num_epochs, loss.data[0]))
-
+			end_time = time.time()
+			# print('epoch [{}/{}], loss:{:.4f}'.format(epoch+1, num_epochs, tr_l2_loss.data[0]))
+			tr_l2_loss, tr_l2_snr = self.eval_err(self.train_dataset, n_batch=self.batch_size)
+			va_l2_loss, va_l2_snr = self.eval_err(self.eval_dataset, n_batch=self.batch_size)
 			#tensorboard steps
 
+			print("Epoch {} of {} took {:.3f}s ({} minibatches)".format(epoch, self.epoch, end_time-start_time, len(self.train_dataset//self.batch_size)))
+			print("Training l2_loss/segsnr:\t\t{:.6f}\t{:.6f}".format(tr_l2_loss, tr_l2_snr))
+			print("Validation l2_loss/segsnr:\t\t{:.6f}\t{:.6f}".format(va_l2_loss, va_l2_snr))
+			
 			#checkpoint the model
 			if (epoch+1) % self.model_save_step == 0:
 				model_path = os.path.join(self.model_save_dir, '{}-model.ckpt'.format(epoch+1))
@@ -89,9 +99,19 @@ class Solver(object):
 
 		torch.save(self.model.state_dict(), './AudioUnet.pth')
 
+	def eval_err(self, dataset, n_batch=128):
+		"""Error Evaluation loops"""
+		batch_iterator = dataloader(dataset, n_batch, shuffle=True, num_workers=4)
 
-		
-
+		l2_loss, snr = 0, 0
+		tot_l2_loss, tot_snr = 0, 0
+		self.model.eval()
+		for bn, X, Y in enumerate(batch_iterator):
+			output = self.model(X)
+			l2_loss, l2_snr = avg_sqrt_l2_loss(Y, output)
+			tot_l2_loss += l2_loss.item()
+			tot_snr += l2_snr.item()
+		return tot_l2_loss / (bn+1), tot_snr / (bn+1)
 
 
 	def load_data(self):
