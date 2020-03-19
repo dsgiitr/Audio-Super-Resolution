@@ -11,6 +11,7 @@ import torch.utils.data.Dataloader as dataloader
 from dataset import DataSet
 from model import Down1d, Up1d, Bottleneck, AudioUnet
 from utility import avg_sqrt_l2_loss
+from io import load_h5
 
 import librosa
 
@@ -25,13 +26,14 @@ class Solver(object):
 		self.train_path = self.config['train_path']
 		self.eval_path = self.config['eval_path']
 
+		self.epoch = self.config['epoch']
+		self.batch_size = self.config['batch_size']
+		self.log_dir = self.config['log_dir']
+		self.num_layers = self.config['num_layers']
 		self.alg = self.config['alg']
 		self.lr = self.config['lr']
 		self.betas = (self.config['b1'], self.config['b2'])
-		self.num_layers = self.config['num_layers']
-		self.batch_size = self.config['batch_size']
-		self.log_dir = self.config['log_dir']
-		self.epoch = self.config['epoch']
+		
 		self.model_save_dir = self.config['model_save_dir']
 		self.model_save_step = self.config['model_save_step']
 
@@ -67,6 +69,7 @@ class Solver(object):
 	def train(self):
 		build_model()
 		build_tensorboard()
+		load_dataset()
 		data_loader = dataloader(self.train_dataset, self.batch, shuffle=True, num_workers=4)
 
 		#train Loops
@@ -119,8 +122,27 @@ class Solver(object):
 		return tot_l2_loss / (bn+1), tot_snr / (bn+1)
 
 
-	def load_dataset(self, train=True):
+	def load_dataset(self):
 		"""Load the dataset"""
-		self.train_dataset = DataSet(self.train_path)
-		self.eval_dataset = DataSet(self.eval_path)
+		
+		X_train, Y_train = load_h5(args.train)
+		X_val, Y_val = load_h5(args.val)
+
+		# determine super-resolution level
+		n_dim, n_chan = Y_train[0].shape
+		self.r = Y_train[0].shape[1] / X_train[0].shape[1]
+		assert n_chan == 1
+
+		self.train_dataset = DataSet(X_train, Y_train)
+		self.eval_dataset = DataSet(X_val, Y_val)
+
+	def load_model(self, resume_training=True, epoch):
+		if resume_training:
+			model_path = os.path.join(self.model_save_dir, '{}-model.ckpt'.format(epoch))
+			self.model.load_state_dict(torch.load(model_path))
+		else:
+			self.model = AudioUnet(self.num_layers)
+			model = model.to(self.device)
+			self.model.load_state_dict(torch.load('./AudioUnet.pth'))
+			model.eval()
 

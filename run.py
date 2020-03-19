@@ -1,16 +1,14 @@
 import os
-os.sys.path.append(os.path.abspath('.'))
-os.sys.path.append(os.path.dirname(os.path.abspath('.')))
-
 import matplotlib
 matplotlib.use('Agg')
 
 import argparse
 import numpy as np
 
-import models
-from models.model import default_opt
-from models.io import load_h5, upsample_wav
+import model
+import train
+from io import load_h5, upsample_wav
+import dataset
 
 # ----------------------------------------------------------------------------
 
@@ -22,7 +20,7 @@ def make_parser():
 
   train_parser = subparsers.add_parser('train')
   train_parser.set_defaults(func=train)
-
+ 
   train_parser.add_argument('--train', required=True,
     help='path to h5 archive of training patches')
   train_parser.add_argument('--val', required=True,
@@ -31,7 +29,7 @@ def make_parser():
     help='number of epochs to train')
   train_parser.add_argument('--batch-size', type=int, default=128,
     help='training batch size')
-  train_parser.add_argument('--logname', default='tmp-run',
+  train_parser.add_argument('--logdir', default='tmp-run',
     help='folder where logs will be stored')
   train_parser.add_argument('--layers', default=4, type=int,
     help='number of layers in each of the D and U halves of the network')
@@ -39,6 +37,15 @@ def make_parser():
     help='optimization algorithm')
   train_parser.add_argument('--lr', default=1e-3, type=float,
     help='learning rate')
+  train_parser.add_argument('--b1', default=0.99, type=float,
+    help='beta1 for adam')
+  train_parser.add_argument('--b2', default=0.999, type=float,
+    help='beta2 for adam')
+  train_parser.add_argument('--save_dir', default='save-dir',
+    help='Directory to save Model checkpoints')
+  train_parser.add_argument('--save_step', default=10, type=int,
+    help='epochs after which to save the model')
+
 
   # eval
 
@@ -60,17 +67,10 @@ def make_parser():
 # ----------------------------------------------------------------------------
 
 def train(args):
-  # get data
-  X_train, Y_train = load_h5(args.train)
-  X_val, Y_val = load_h5(args.val)
 
-  # determine super-resolution level
-  n_dim, n_chan = Y_train[0].shape
-  r = Y_train[0].shape[1] / X_train[0].shape[1]
-  assert n_chan == 1
 
   # create model
-  model = get_model(args, n_dim, r, from_ckpt=False, train=True)
+  model = get_model(, n_dim, r, from_ckpt=False, train=True)
 
   # train model
   model.fit(X_train, Y_train, X_val, Y_val, n_epoch=args.epochs)
@@ -92,7 +92,7 @@ def eval(args):
 def get_model(args, n_dim, r, from_ckpt=False, train=True):
   """Create a model based on arguments"""  
   if train:
-    opt_params = { 'alg' : args.alg, 'lr' : args.lr, 'b1' : 0.9, 'b2' : 0.999,
+    config = { 'alg' : args.alg, 'lr' : args.lr, 'b1' : args.beta1, 'b2' : 0.999,
                    'batch_size': args.batch_size, 'layers': args.layers }
   else: 
     opt_params = default_opt
